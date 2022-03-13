@@ -60,3 +60,4 @@ DNN 끝 단에서, 결과로 나올 **User vector(1차 output)** 으로 extreme-
 ---
 ## Develop-Log
 - (2022.03.13): Reading Paper, and Drawing base architecture, Making BaseDataset class in Dataset.py
+- (2022.03.13): How to get embed aggregate !
