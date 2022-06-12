@@ -102,18 +102,50 @@ class Trainer:
 
         return loss
 
-    def rmse(self, seq_out, pos_ids, target_ratings):
-        # [batch seq_len hidden_size]
-        pos_emb = self.model.item_embeddings(pos_ids)
-        # [batch*seq_len hidden_size]
-        pos = pos_emb.view(-1, pos_emb.size(2))
-        seq_emb = seq_out.view(-1, self.args.hidden_size)  # [batch*seq_len hidden_size]
-        pos_logits = torch.sum(pos * seq_emb, -1)  # [batch*seq_len]
+    def loss_fn(self, seq_out, pos_ids, target_ratings):
+        # seq_out, pos_ids, target_ratings => [batch X seq_len]
         
-        mse = torch.nn.MSELoss()
-        loss = torch.sqrt(mse(pos_logits, target_ratings.view(-1)) + 1e-6)
+        pos_emb = self.model.item_embeddings(pos_ids) # [batch X seq_len X hidden_size]
+        pos = pos_emb.view(-1, pos_emb.size(2)) # [batch*seq_len X hidden_size]
+        
+        # seq_out => [batch X seq_len X hidden_size]
+        # seq_emb => [batch*seq_len X hidden_size]
+        seq_emb = seq_out.view(-1, self.args.hidden_size)  # [batch*seq_len X hidden_size]
+        pos_logits = torch.sum(pos * seq_emb, -1)  # [batch*seq_len]
+
+        istarget = (pos_ids > 0).view(-1).float()  # [batch*seq_len]
+
+        loss = torch.sum(
+            torch.log(torch.sigmoid(target_ratings) + 1e-24) * istarget
+            -torch.log(torch.sigmoid(pos_logits) + 1e-24) * istarget
+        ) / torch.sum(istarget)
 
         return loss
+
+
+    def rmse(self, seq_out, pos_ids, target_ratings):
+        # seq_out, pos_ids, target_ratings => [batch X seq_len]
+        
+        pos_emb = self.model.item_embeddings(pos_ids) # [batch X seq_len X hidden_size]
+        pos = pos_emb.view(-1, pos_emb.size(2)) # [batch*seq_len X hidden_size]
+        
+        # seq_out => [batch X seq_len X hidden_size]
+        # seq_emb => [batch*seq_len X hidden_size]
+        seq_emb = seq_out.view(-1, self.args.hidden_size)  # [batch*seq_len X hidden_size]
+        pos_logits = torch.sum(pos * seq_emb, -1)  # [batch*seq_len]
+
+        istarget = (pos_ids > 0).view(-1).float()
+
+        loss_mse = torch.sum(
+            (pos_logits - target_ratings.view(-1))**2 *istarget
+        ) / torch.sum(istarget)
+
+        loss_rmse = torch.sqrt(loss_mse)
+
+        # mse = torch.nn.MSELoss()
+        # loss = torch.sqrt(mse(pos_logits, target_ratings.view(-1)) + 1e-6)
+
+        return loss_rmse
 
     def predict_full(self, seq_out):
         # [item_num hidden_size]
@@ -162,10 +194,15 @@ class ExplicitTrainer(Trainer):
                 batch = tuple(t.to(self.device) for t in batch)
                 _, input_ids, input_ratings, target_pos, target_neg, target_ratings, _, _ = batch
 
+                sequence_output = self.model.forward(input_ids, input_ratings)
                 # Binary cross_entropy
-                sequence_output = self.model.forward(input_ids, input_ratings) ############## TODO
                 # loss = self.cross_entropy(sequence_output, target_pos, target_neg)
+                
+                # RMSE
                 loss = self.rmse(sequence_output, target_pos, target_ratings)
+
+                # BCE logits
+                # loss = self.loss_fn(sequence_output, target_pos, target_ratings)
                 self.optim.zero_grad()
                 loss.backward()
                 self.optim.step()
@@ -191,7 +228,7 @@ class ExplicitTrainer(Trainer):
 
                 batch = tuple(t.to(self.device) for t in batch)
                 user_ids, input_ids, input_ratings, _, target_neg, target_ratings, answers, ratings_answer = batch
-                recommend_output = self.model.finetune(input_ids,  input_ratings) ############## TODO
+                recommend_output = self.model.forward(input_ids,  input_ratings) ############## TODO
 
                 recommend_output = recommend_output[:, -1, :]
                 # print(">>>>> recommend_output.size:", recommend_output.size())
@@ -250,97 +287,3 @@ class ExplicitTrainer(Trainer):
                 post_fix = {"Epoch": epoch, "rmse":score}
                 print(post_fix)
                 return [score], str(post_fix)
-
-
-
-# class PretrainTrainer(Trainer):
-#     def __init__(
-#         self,
-#         model,
-#         train_dataloader,
-#         eval_dataloader,
-#         test_dataloader,
-#         submission_dataloader,
-#         args,
-#     ):
-#         super(PretrainTrainer, self).__init__(
-#             model,
-#             train_dataloader,
-#             eval_dataloader,
-#             test_dataloader,
-#             submission_dataloader,
-#             args,
-#         )
-
-#     def pretrain(self, epoch, pretrain_dataloader):
-
-#         desc = (
-#             f"AAP-{self.args.aap_weight}-"
-#             f"MIP-{self.args.mip_weight}-"
-#             f"MAP-{self.args.map_weight}-"
-#             f"SP-{self.args.sp_weight}"
-#         )
-
-#         pretrain_data_iter = tqdm.tqdm(
-#             enumerate(pretrain_dataloader),
-#             desc=f"{self.args.model_name}-{self.args.data_name} Epoch:{epoch}",
-#             total=len(pretrain_dataloader),
-#             bar_format="{l_bar}{r_bar}",
-#         )
-
-#         self.model.train()
-#         aap_loss_avg = 0.0
-#         mip_loss_avg = 0.0
-#         map_loss_avg = 0.0
-#         sp_loss_avg = 0.0
-
-#         for i, batch in pretrain_data_iter:
-#             # 0. batch_data will be sent into the device(GPU or CPU)
-#             batch = tuple(t.to(self.device) for t in batch)
-#             (
-#                 attributes,
-#                 masked_item_sequence,
-#                 pos_items,
-#                 neg_items,
-#                 masked_segment_sequence,
-#                 pos_segment,
-#                 neg_segment,
-#             ) = batch
-
-#             aap_loss, mip_loss, map_loss, sp_loss = self.model.pretrain(
-#                 attributes,
-#                 masked_item_sequence,
-#                 pos_items,
-#                 neg_items,
-#                 masked_segment_sequence,
-#                 pos_segment,
-#                 neg_segment,
-#             )
-
-#             joint_loss = (
-#                 self.args.aap_weight * aap_loss
-#                 + self.args.mip_weight * mip_loss
-#                 + self.args.map_weight * map_loss
-#                 + self.args.sp_weight * sp_loss
-#             )
-
-#             self.optim.zero_grad()
-#             joint_loss.backward()
-#             self.optim.step()
-
-#             aap_loss_avg += aap_loss.item()
-#             mip_loss_avg += mip_loss.item()
-#             map_loss_avg += map_loss.item()
-#             sp_loss_avg += sp_loss.item()
-
-#         num = len(pretrain_data_iter) * self.args.pre_batch_size
-#         losses = {
-#             "epoch": epoch,
-#             "aap_loss_avg": aap_loss_avg / num,
-#             "mip_loss_avg": mip_loss_avg / num,
-#             "map_loss_avg": map_loss_avg / num,
-#             "sp_loss_avg": sp_loss_avg / num,
-#         }
-#         print(desc)
-#         print(str(losses))
-#         return losses
