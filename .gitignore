@@ -1,4 +1,18 @@
+
+## MacOS
 .DS_Store
-build_model_test.ipynb
-build_dataset_test.ipynb
+
+
+## test jupyter notebook
+*_test.ipynb
+*-test.ipynb
+
+## python file
+*.pt
+*.npy
+__pycache__
+*.pyc
+
+## data
 *.dat
+*.csv
