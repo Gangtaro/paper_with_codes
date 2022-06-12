@@ -20,24 +20,24 @@ from utils import (
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--data_dir", default="../../../data/train/", type=str)
+    parser.add_argument("--data_dir", default="../data/ml-1m/", type=str) # 데이터셋은 movieLens1m을 기준으로 한다.
     parser.add_argument("--output_dir", default="output/", type=str)
     parser.add_argument("--data_name", default="ml", type=str)
 
     # model args
     parser.add_argument("--model_name", default="SASRec_for_Explicit", type=str)
     parser.add_argument("--hidden_size", default=64, type=int, help="hidden size of transformer model")
-    parser.add_argument("--num_hidden_layers", default=2, type=int, help="number of layers")
+    parser.add_argument("--num_hidden_layers", default=3, type=int, help="number of layers")
     parser.add_argument("--num_attention_heads", default=2, type=int)
     parser.add_argument("--hidden_act", default="gelu", type=str, help="Opt) gelu relu")
     parser.add_argument("--attention_probs_dropout_prob", default=0.5, type=float, help="attention dropout p",)
     parser.add_argument("--hidden_dropout_prob", default=0.5, type=float, help="hidden dropout p")
     parser.add_argument("--initializer_range", default=0.02, type=float)
-    parser.add_argument("--max_seq_length", default=50, type=int)
+    parser.add_argument("--max_seq_length", default=500, type=int)
 
     # train args
     parser.add_argument("--lr", type=float, default=0.001, help="learning rate of adam")
-    parser.add_argument("--batch_size", type=int, default=256, help="number of batch_size")
+    parser.add_argument("--batch_size", type=int, default=64, help="number of batch_size")
     parser.add_argument("--epochs", type=int, default=200, help="number of epochs")
     parser.add_argument("--no_cuda", action="store_true")
     parser.add_argument("--log_freq", type=int, default=1, help="per epoch print res")
