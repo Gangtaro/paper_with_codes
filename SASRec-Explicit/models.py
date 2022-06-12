@@ -43,8 +43,8 @@ class SASRecExplicit(nn.Module):
         extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)  # torch.int64
 
         # Attention Weight Mask : weight Ratings to Attention score
-        # input_ratings: sequence of ratings (0~1)
-        weighted_mask = input_ratings
+        # input_ratings: sequence of ratings (1~5 -> 0~1)
+        weighted_mask = input_ratings/5
         extended_weighted_mask = weighted_mask.unsqueeze(1).unsqueeze(2)
 
         max_len = attention_mask.size(-1)
