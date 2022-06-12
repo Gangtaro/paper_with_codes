@@ -117,11 +117,9 @@ class SelfAttention(nn.Module):
         # [batch_size heads seq_len seq_len] scores
         # [batch_size 1 1 seq_len]
 
-        if weight_mask:
-            attention_scores = (attention_scores*weight_mask) + attention_mask
-        else :
-            attention_scores = attention_scores + attention_mask
-
+        # attention_scores = attention_scores + attention_mask
+        attention_scores = (attention_scores*weight_mask) + attention_mask
+        
         # Normalize the attention scores to probabilities.
         attention_probs = nn.Softmax(dim=-1)(attention_scores)
         # This is actually dropping out entire tokens to attend to, which might
@@ -171,11 +169,7 @@ class Layer(nn.Module):
         self.intermediate = Intermediate(args)
 
     def forward(self, hidden_states, attention_mask, weight_mask = None):
-        if weight_mask:
-            attention_output = self.attention(hidden_states, attention_mask, weight_mask)
-        else : 
-            attention_output = self.attention(hidden_states, attention_mask)
-
+        attention_output = self.attention(hidden_states, attention_mask, weight_mask)
         intermediate_output = self.intermediate(attention_output)
         return intermediate_output
 
